@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리 집 장보기</title>
+<style>
+  :root {
+    --bg: #fff0f4;
+    --card: #ffffff;
+    --pink: #f48fb1;
+    --pink-dark: #d9628f;
+    --pink-soft: #ffe1ea;
+    --text: #5a3a46;
+    --muted: #b48a99;
+    --line: #f8d3df;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
+  header h1 { margin: 0 0 4px; font-size: 1.7rem; color: var(--pink-dark); }
+  header p { margin: 0 0 20px; color: var(--muted); font-size: .95rem; }
+
+  .add {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 14px;
+    box-shadow: 0 4px 14px rgba(217, 98, 143, .12);
+    display: grid;
+    grid-template-columns: 1fr 90px;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .add input, .add select {
+    width: 100%;
+    border: 2px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font: inherit;
+    color: var(--text);
+    background: #fff;
+  }
+  .add input:focus, .add select:focus { outline: none; border-color: var(--pink); }
+  .add select { grid-column: 1; }
+  .btn {
+    border: 0;
+    border-radius: 12px;
+    background: var(--pink);
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    padding: 10px 14px;
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--pink-dark); }
+
+  .section {
+    background: var(--card);
+    border-radius: 20px;
+    padding: 14px 16px 8px;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 14px rgba(217, 98, 143, .10);
+  }
+  .section h2 {
+    margin: 0 0 6px;
+    font-size: 1.05rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .count { font-size: .8rem; font-weight: 500; color: var(--muted); }
+  .empty { color: var(--muted); font-size: .9rem; padding: 6px 0 10px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-top: 1px dashed var(--line);
+  }
+  li:first-child { border-top: 0; }
+  li label { flex: 1; display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+  li input[type=checkbox] {
+    appearance: none;
+    width: 22px; height: 22px;
+    border: 2px solid var(--pink);
+    border-radius: 7px;
+    flex-shrink: 0;
+    display: grid; place-content: center;
+    cursor: pointer;
+  }
+  li input[type=checkbox]:checked { background: var(--pink); }
+  li input[type=checkbox]:checked::after { content: "✓"; color: #fff; font-size: 14px; font-weight: 700; }
+  .name { overflow-wrap: anywhere; }
+  .qty {
+    width: 70px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 4px 8px;
+    font: inherit;
+    font-size: .85rem;
+    color: var(--text);
+    background: var(--pink-soft);
+    text-align: center;
+  }
+  .qty:focus { outline: none; border-color: var(--pink); background: #fff; }
+  .del {
+    border: 0; background: none; color: var(--muted);
+    font-size: 1.1rem; cursor: pointer; padding: 2px 6px; border-radius: 8px;
+  }
+  .del:hover { color: var(--pink-dark); background: var(--pink-soft); }
+  li.done .name { text-decoration: line-through; color: var(--muted); }
+  li.done .qty { opacity: .5; }
+
+  .bottom { text-align: center; margin-top: 22px; }
+  .btn.ghost { background: #fff; color: var(--pink-dark); border: 2px solid var(--pink); }
+  .btn.ghost:hover { background: var(--pink-soft); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🛒 우리 집 장보기</h1>
+    <p id="summary">담을 것을 체크해 보세요</p>
+  </header>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <input id="newName" placeholder="살 것 (예: 대파)" required>
+    <input id="newQty" placeholder="수량">
+    <select id="newCat"></select>
+    <button class="btn" type="submit">추가</button>
+  </form>
+
+  <div id="list"></div>
+
+  <div class="bottom">
+    <button class="btn ghost" id="clearDone" type="button">🧹 담은 것 비우기</button>
+  </div>
+</div>
+
+<script>
+  const KEY = "jangbogi-v1";
+  const CATS = [
+    { id: "veg",   label: "🥬 채소·과일" },
+    { id: "meat",  label: "🥩 정육·수산" },
+    { id: "dairy", label: "🥛 유제품·계란" },
+    { id: "grain", label: "🍚 곡물·가공식품" },
+    { id: "home",  label: "🧻 생활용품" },
+  ];
+  const DEFAULTS = [
+    ["veg", "파", "1단"], ["veg", "양파", "1망"], ["veg", "감자", "1봉"], ["veg", "사과", "4개"],
+    ["meat", "돼지고기", "600g"], ["meat", "닭고기", "1마리"],
+    ["dairy", "계란", "1판"], ["dairy", "우유", "1L"], ["dairy", "두부", "1모"],
+    ["grain", "쌀", "10kg"], ["grain", "라면", "1봉"],
+    ["home", "휴지", "1팩"], ["home", "주방세제", "1개"],
+  ];
+
+  let items = load();
+
+  function load() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY));
+      if (Array.isArray(saved)) return saved;
+    } catch (e) {}
+    return DEFAULTS.map(([cat, name, qty], i) => ({ id: Date.now() + i, cat, name, qty, done: false }));
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) {}
+  }
+
+  const listEl = document.getElementById("list");
+  const catSel = document.getElementById("newCat");
+  catSel.innerHTML = CATS.map(c => `<option value="${c.id}">${c.label}</option>`).join("");
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  }
+
+  function render() {
+    listEl.innerHTML = CATS.map(c => {
+      const inCat = items.filter(it => it.cat === c.id);
+      const sorted = [...inCat.filter(it => !it.done), ...inCat.filter(it => it.done)];
+      const doneN = inCat.filter(it => it.done).length;
+      const rows = sorted.map(it => `
+        <li class="${it.done ? "done" : ""}" data-id="${it.id}">
+          <label>
+            <input type="checkbox" ${it.done ? "checked" : ""} aria-label="${esc(it.name)} 담기">
+            <span class="name">${esc(it.name)}</span>
+          </label>
+          <input class="qty" value="${esc(it.qty)}" placeholder="수량" aria-label="${esc(it.name)} 수량">
+          <button class="del" type="button" title="지우기" aria-label="${esc(it.name)} 지우기">✕</button>
+        </li>`).join("");
+      return `<section class="section">
+        <h2>${c.label} <span class="count">${inCat.length ? doneN + " / " + inCat.length : ""}</span></h2>
+        ${inCat.length ? `<ul>${rows}</ul>` : `<div class="empty">아직 항목이 없어요</div>`}
+      </section>`;
+    }).join("");
+
+    const total = items.length, done = items.filter(it => it.done).length;
+    document.getElementById("summary").textContent =
+      total ? `${total}개 중 ${done}개 담았어요` : "살 것을 추가해 보세요";
+  }
+
+  function findItem(el) {
+    const li = el.closest("li");
+    return li && items.find(it => String(it.id) === li.dataset.id);
+  }
+
+  listEl.addEventListener("change", e => {
+    const it = findItem(e.target);
+    if (!it) return;
+    if (e.target.type === "checkbox") {
+      it.done = e.target.checked;
+      save(); render();
+    } else if (e.target.classList.contains("qty")) {
+      it.qty = e.target.value.trim();
+      save();
+    }
+  });
+  listEl.addEventListener("input", e => {
+    if (!e.target.classList.contains("qty")) return;
+    const it = findItem(e.target);
+    if (it) { it.qty = e.target.value; save(); }
+  });
+  listEl.addEventListener("click", e => {
+    if (!e.target.classList.contains("del")) return;
+    const it = findItem(e.target);
+    if (!it) return;
+    items = items.filter(x => x !== it);
+    save(); render();
+  });
+
+  document.getElementById("addForm").addEventListener("submit", e => {
+    e.preventDefault();
+    const nameEl = document.getElementById("newName");
+    const qtyEl = document.getElementById("newQty");
+    const name = nameEl.value.trim();
+    if (!name) return;
+    items.push({ id: Date.now(), cat: catSel.value, name, qty: qtyEl.value.trim(), done: false });
+    save(); render();
+    nameEl.value = ""; qtyEl.value = "";
+    nameEl.focus();
+  });
+
+  document.getElementById("clearDone").addEventListener("click", () => {
+    items.forEach(it => { it.done = false; });
+    save(); render();
+  });
+
+  render();
+</script>
+</body>
+</html>

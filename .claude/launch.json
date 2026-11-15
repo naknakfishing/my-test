@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jangbogi",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5517", "--bind", "127.0.0.1", "--directory", "장보기"],
+      "port": 5517
+    }
+  ]
+}
